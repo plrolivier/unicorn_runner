@@ -9,9 +9,10 @@ int load_program(uc_engine *uc, unsigned long load_address, const char *program_
     FILE *fp;
     long file_size;
     unsigned char *buffer;
-    size_t bytes_read;
+    size_t bytes_read, mapped_program_size;
     uc_err err;
 
+    /* Read program */
     fp = fopen(program_path, "rb");
     if (!fp) {
         perror("Failed to read file");
@@ -45,6 +46,16 @@ int load_program(uc_engine *uc, unsigned long load_address, const char *program_
 
     fclose(fp);
 
+    /* Map memory */
+    mapped_program_size = (file_size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    err = uc_mem_map(uc, load_address, mapped_program_size, UC_PROT_ALL);
+    if (err != UC_ERR_OK) {
+        fprintf(stderr, "Fail to map program memory: %u (%s)\n", err, uc_strerror(err));
+        free(buffer);
+        return -1;
+    }
+
+    /* Write program to mapped memory */
     err = uc_mem_write(uc, load_address, buffer, file_size);
     if (err != UC_ERR_OK) {
         fprintf(stderr, "Fail to load program into unicorn memory: %u (%s)\n", err, uc_strerror(err));
