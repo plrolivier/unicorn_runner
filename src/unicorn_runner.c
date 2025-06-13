@@ -7,12 +7,10 @@
 
 #define STACK_TOP_ADDRESS 0xc000000
 
-unsigned long load_address;
 unsigned long stack_size;
-size_t program_size = 0;
 
 
-uc_engine *init_unicorn(const char *program_path, int program_argc, char *program_argv[])
+uc_engine *init_unicorn(struct program_info *pinfo)
 {
     uc_engine *uc;
     uc_err err;
@@ -30,7 +28,7 @@ uc_engine *init_unicorn(const char *program_path, int program_argc, char *progra
     }
 
     /* Load the program into memory */
-    if (load_program(uc, load_address, program_path, &program_size) != 0) {
+    if (load_program(uc, pinfo) != 0) {
         fprintf(stderr, "Failed to load program in memory\n");
         uc_close(uc);
         return NULL;
@@ -40,10 +38,10 @@ uc_engine *init_unicorn(const char *program_path, int program_argc, char *progra
     stack_bottom = STACK_TOP_ADDRESS - stack_size;
 
     /* Check for overlapping with program code */
-    program_end_addr = load_address + program_size;
-    if (load_address < STACK_TOP_ADDRESS && program_end_addr > stack_bottom) {
+    program_end_addr = pinfo->base_address + pinfo->size;
+    if (pinfo->base_address < STACK_TOP_ADDRESS && program_end_addr > stack_bottom) {
         fprintf(stderr, "Memory overlap detected between program (0x%lx - 0x%lx) and stack (0x%lx - 0x%x)\n",
-                load_address, program_end_addr -1, stack_bottom, STACK_TOP_ADDRESS -1);
+                pinfo->base_address, program_end_addr -1, stack_bottom, STACK_TOP_ADDRESS -1);
         uc_close(uc);
         return NULL;
     }
@@ -59,6 +57,7 @@ uc_engine *init_unicorn(const char *program_path, int program_argc, char *progra
 
     /* Initialize registers */
     uc_reg_write(uc, UC_X86_REG_ESP, &r_esp);
+    // todo
 
     // Register hooks
     uc_hook_add(uc, &trace, UC_HOOK_CODE, hook_code, NULL, 1, 0);
@@ -66,14 +65,15 @@ uc_engine *init_unicorn(const char *program_path, int program_argc, char *progra
     return uc;
 }
 
-int start_emulation(uc_engine *uc)
+int start_emulation(uc_engine *uc, const struct program_info *pinfo)
 {
     uc_err err;
 
     printf("[>] Start emulation...\n");
 
     // emulate code in infinite time & unlimited instructions
-    err = uc_emu_start(uc, load_address, load_address + program_size, 0, 0);
+    // TODO: verify if values makes sense here
+    err = uc_emu_start(uc, pinfo->entrypoint, pinfo->entrypoint + pinfo->size, 0, 0);
     if (err) {
         printf("Failed on uc_emu_start() with error returned %u: %s\n", err, uc_strerror(err));
         uc_close(uc);

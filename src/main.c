@@ -14,7 +14,7 @@ static void  print_usage(const char *prog_name, FILE *stream)
     fprintf(stream, "  <program>                Path to the raw binary file to emulate.\n\n");
     fprintf(stream, "Options:\n");
     fprintf(stream, "  -h, --help               Display this help message and exit.\n");
-    fprintf(stream, "  -B, --address address    Set the load address (default: 0x%x)\n", DEFAULT_LOAD_ADDRESS);
+    fprintf(stream, "  -B, --address address    Set the base address (default: 0x%x)\n", DEFAULT_BASE_ADDRESS);
     fprintf(stream, "  -s, --size size          Set stack size (default 1MB)\n");
 }
 
@@ -22,14 +22,16 @@ static void  print_usage(const char *prog_name, FILE *stream)
 int main(int argc, char *argv[])
 {
     uc_engine *uc;
-    unsigned long parsed_load_address = DEFAULT_LOAD_ADDRESS;
+    struct program_info pinfo;
+    unsigned long parsed_base_address = DEFAULT_BASE_ADDRESS;
     unsigned long parsed_stack_size = DEFAULT_STACK_SIZE;
-    const char *program_path = NULL;
-    int program_argc = 0;
-    char **program_argv = NULL;
     int opt;
     char *endptr;
 
+    pinfo.base_address = DEFAULT_BASE_ADDRESS;
+    pinfo.path = NULL;
+
+    /* Argument parsing */
     static struct option long_options[] = {
         {"help",    no_argument,        0, 'h'},
         {"address", required_argument,  0, 'B'},
@@ -43,7 +45,6 @@ int main(int argc, char *argv[])
         return EXIT_SUCCESS;
     }
 
-    /* Argument parsing */
     while ((opt = getopt_long(argc, argv, "hB:s:", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'h':
@@ -52,7 +53,7 @@ int main(int argc, char *argv[])
             
             case 'B':
                 errno = 0;
-                parsed_load_address = strtoul(optarg, &endptr, 0);
+                parsed_base_address = strtoul(optarg, &endptr, 0);
                 if (errno == ERANGE || *endptr != '\0' || optarg == endptr) {
                     fprintf(stderr, "Error: Invalid address for -B: %s\n", optarg);
                     return EXIT_FAILURE;
@@ -75,7 +76,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    load_address = parsed_load_address;
+    pinfo.base_address = parsed_base_address;
     stack_size = parsed_stack_size;
 
     /* The remaining are the program path and its arguments */
@@ -83,23 +84,24 @@ int main(int argc, char *argv[])
         print_usage(argv[0], stderr);
         return EXIT_FAILURE;
     }
-    program_path = argv[optind];
+    pinfo.path = argv[optind];
     optind++;
 
     if (optind < argc) {
-        program_argc = argc - optind;
-        program_argv = &argv[optind];
+        pinfo.argc = argc - optind;
+        pinfo.argv = &argv[optind];
     }
+
 
     /* Let's start the emulation! */
     printf("=== Unicorn runner 3000 ===\n");
 
-    uc = init_unicorn(program_path, program_argc, program_argv);
+    uc = init_unicorn(&pinfo);
     if (uc == NULL) {
         return EXIT_FAILURE;
     }
 
-    if (start_emulation(uc) != 0) {
+    if (start_emulation(uc, &pinfo) != 0) {
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
