@@ -72,8 +72,8 @@ int start_emulation(uc_engine *uc, const struct program_info *pinfo)
     printf("[>] Start emulation...\n");
 
     // emulate code in infinite time & unlimited instructions
-    // TODO: verify if values makes sense here
-    err = uc_emu_start(uc, pinfo->entrypoint, pinfo->entrypoint + pinfo->size, 0, 0);
+    // TODO: verify if values makes sense here... take the size of the code segment.
+    err = uc_emu_start(uc, pinfo->entrypoint, pinfo->base_address + pinfo->size, 0, 0);
     if (err) {
         printf("Failed on uc_emu_start() with error returned %u: %s\n", err, uc_strerror(err));
         uc_close(uc);
