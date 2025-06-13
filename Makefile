@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Iinclude -Wall -Wextra -g
-LDFLAGS = -lunicorn
+LDFLAGS = -lunicorn -lcapstone
 
 SRCDIR = src
 OBJDIR = obj

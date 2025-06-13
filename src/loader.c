@@ -124,16 +124,14 @@ int load_program(uc_engine *uc, struct program_info *pinfo)
             if (phdr->p_flags & PF_X) uc_perms |= UC_PROT_EXEC;
 
             /* Before mapping and writing, print some debug info */
-            char flags_str[4];
-            snprintf(flags_str, sizeof(flags_str), "%c%c%c",
-                   (phdr->p_flags & PF_R) ? 'R' : '-',
-                   (phdr->p_flags & PF_W) ? 'W' : '-',
-                   (phdr->p_flags & PF_X) ? 'X' : '-');
-            char perms_str[4];
-            snprintf(perms_str, sizeof(perms_str), "%c%c%c",
-                   (uc_perms & UC_PROT_READ) ? 'R' : '-',
-                   (uc_perms & UC_PROT_WRITE) ? 'W' : '-',
-                   (uc_perms & UC_PROT_EXEC) ? 'X' : '-');
+            char flags_str[4] = "---";
+            if (phdr->p_flags & PF_R) flags_str[0] = 'R';
+            if (phdr->p_flags & PF_W) flags_str[1] = 'W';
+            if (phdr->p_flags & PF_X) flags_str[2] = 'X';
+            char perms_str[4] = "---";
+            if (uc_perms & UC_PROT_READ) perms_str[0] = 'R';
+            if (uc_perms & UC_PROT_WRITE) perms_str[1] = 'W';
+            if (uc_perms & UC_PROT_EXEC) perms_str[2] = 'X';
 
             printf("\t  0x%08x 0x%-8x 0x%-8x 0x%-8x %-6s -> 0x%-10llx 0x%-8llx %-s\n",
                    phdr->p_vaddr, phdr->p_memsz, phdr->p_filesz, phdr->p_offset, flags_str,
