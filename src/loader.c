@@ -171,7 +171,7 @@ int load_program(uc_engine *uc, struct program_info *pinfo)
                 size_t bss_size = phdr->p_memsz - phdr->p_filesz;
 
                 if (bss_size > 0) {
-                    unsigned char *zero_buffer = (unsigned char *)calloc(stack_size, 1);
+                    unsigned char *zero_buffer = (unsigned char *)calloc(bss_size, 1);
                     if (!zero_buffer) {
                         fprintf(stderr, "Failed to allocate zero buffer for BSS segment\n");
                         free(buffer);
