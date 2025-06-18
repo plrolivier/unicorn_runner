@@ -8,6 +8,8 @@
 
 #define MIN(a, b) (a < b ? a : b)
 
+bool capstone_init = 0;
+csh cs;
 
 void print_registers(uc_engine *uc) {
     uint32_t eax, ebx, ecx, edx, esi, edi, ebp, esp, eip, eflags;
@@ -29,17 +31,21 @@ void print_registers(uc_engine *uc) {
     printf("    EIP: 0x%08" PRIx32 "  EFLAGS: 0x%08" PRIx32 "\n", eip, eflags);
 }
 
-void print_stack(uc_engine *uc, uint32_t esp_val, uint32_t num_dwords) {
+void print_stack(uc_engine *uc, uint32_t num_dwords) {
     if (num_dwords == 0) {
         return;
     }
 
-    printf("[!] Stack\n");
     uint32_t stack_val;
     uc_err err;
+    uint32_t esp;
+
+    printf("[!] Stack\n");
+
+    uc_reg_read(uc, UC_X86_REG_ESP, &esp);
 
     for (uint32_t i = 0; i < num_dwords; ++i) {
-        uint32_t current_addr = esp_val + (i * sizeof(uint32_t));
+        uint32_t current_addr = esp + (i * sizeof(uint32_t));
         err = uc_mem_read(uc, current_addr, &stack_val, sizeof(stack_val));
         if (err == UC_ERR_OK) {
             printf("    0x%08" PRIx32 ": 0x%08" PRIx32 "\n", current_addr, stack_val);
@@ -51,7 +57,6 @@ void print_stack(uc_engine *uc, uint32_t esp_val, uint32_t num_dwords) {
 }
 
 void print_disassembled_code(uc_engine *uc, uint64_t address, uint32_t max_size, uint32_t num_instructions) {
-    csh handle;
     cs_insn *insn;
     size_t count;
     uc_err err;
@@ -75,14 +80,17 @@ void print_disassembled_code(uc_engine *uc, uint64_t address, uint32_t max_size,
         return;
     }
 
-    if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK) {
-        fprintf(stderr, "Failed to initialize Capstone\n");
-        free(buffer);
-        return;
+    if (!capstone_init) {
+        if (cs_open(CS_ARCH_X86, CS_MODE_32, &cs) != CS_ERR_OK) {
+            fprintf(stderr, "Failed to initialize Capstone\n");
+            free(buffer);
+            return;
+        }
+        capstone_init = 1;
     }
 
     printf("[!] Disassembly\n");
-    count = cs_disasm(handle, buffer, read_size, address, num_instructions, &insn);
+    count = cs_disasm(cs, buffer, read_size, address, num_instructions, &insn);
     if (count > 0) {
         for (size_t j = 0; j < count; j++) {
             printf("    0x%"PRIx64":\t%s\t\t%s\n", insn[j].address, insn[j].mnemonic, insn[j].op_str);
@@ -92,7 +100,7 @@ void print_disassembled_code(uc_engine *uc, uint64_t address, uint32_t max_size,
         printf("    <Failed to disassemble code at 0x%"PRIx64">\n", address);
     }
 
-    cs_close(&handle);
+    cs_close(&cs);
     free(buffer);
 }
 
@@ -129,28 +137,36 @@ void print_memory_mappings(uc_engine *uc) {
 
 void hook_code(uc_engine *uc, uint64_t address, uint32_t size, void *user_data)
 {
-    uint32_t r_eip, r_esp;
-    uint8_t tmp[16];
-
-    printf("-----------------------------------------------------------------\n");
-    printf("Tracing instruction at 0x%" PRIx64 ", instruction size = 0x%x\n",
-           address, size);
+    uint32_t r_eip;
+    cs_insn *insn;
+    size_t count;
+    uc_err err;
+    unsigned char buffer[15];
 
     uc_reg_read(uc, UC_X86_REG_EIP, &r_eip);
-    printf("*** EIP = %x ***: ", r_eip);
 
-    size = MIN(sizeof(tmp), size);
-    if (!uc_mem_read(uc, address, tmp, size)) {
-        uint32_t i;
-        for (i = 0; i < size; i++) {
-            printf("%x ", tmp[i]);
+    uc_mem_read(uc, r_eip, buffer, 15);
+
+    if (!capstone_init) {
+        if (cs_open(CS_ARCH_X86, CS_MODE_32, &cs) != CS_ERR_OK) {
+            fprintf(stderr, "Failed to initialize Capstone\n");
+            return;
         }
-        printf("\n");
+        capstone_init = 1;
     }
 
+    count = cs_disasm(cs, buffer, 15, address, 1, &insn);
+    if (count > 0) {
+        printf("    0x%"PRIx64":\t%s\t\t%s\n", insn[0].address, insn[0].mnemonic, insn[0].op_str);
+        cs_free(insn, count);
+    } else {
+        printf("    <Failed to disassemble code at 0x%"PRIx64">\n", address);
+    }
+
+    /*
     print_registers(uc);
-    uc_reg_read(uc, UC_X86_REG_ESP, &r_esp);
-    print_stack(uc, r_esp, 8);
+    print_stack(uc, 8);
     print_disassembled_code(uc, address, 64, 5);
     print_memory_mappings(uc);
+    */
 }

@@ -3,7 +3,7 @@
 #include <unicorn/unicorn.h>
 
 void print_registers(uc_engine *uc);
-void print_stack(uc_engine *uc, uint32_t esp_val, uint32_t num_dwords);
+void print_stack(uc_engine *uc, uint32_t num_dwords);
 void print_disassembled_code(uc_engine *uc, uint64_t address, uint32_t max_size, uint32_t num_instructions);
 void print_memory_mappings(uc_engine *uc);
 

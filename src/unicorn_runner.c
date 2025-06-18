@@ -90,7 +90,7 @@ uc_engine *init_unicorn(struct program_info *pinfo)
     /* Some debugging info */
     print_memory_mappings(uc);
     print_registers(uc);
-    print_stack(uc, r_esp, 8);
+    print_stack(uc, 8);
 
     return uc;
 }
@@ -106,6 +106,9 @@ int start_emulation(uc_engine *uc, const struct program_info *pinfo)
     err = uc_emu_start(uc, pinfo->entrypoint, pinfo->base_address + pinfo->size, 0, 0);
     if (err) {
         printf("Failed on uc_emu_start() with error returned %u: %s\n", err, uc_strerror(err));
+        print_registers(uc);
+        print_stack(uc, 8);
+        print_memory_mappings(uc);
         uc_close(uc);
         return -1;
     }
