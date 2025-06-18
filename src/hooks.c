@@ -100,7 +100,6 @@ void print_disassembled_code(uc_engine *uc, uint64_t address, uint32_t max_size,
         printf("    <Failed to disassemble code at 0x%"PRIx64">\n", address);
     }
 
-    cs_close(&cs);
     free(buffer);
 }
 
