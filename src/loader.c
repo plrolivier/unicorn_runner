@@ -137,7 +137,6 @@ int load_program(uc_engine *uc, struct program_info *pinfo)
                    phdr->p_vaddr, phdr->p_memsz, phdr->p_filesz, phdr->p_offset, flags_str,
                    (unsigned long long)map_start_addr, (unsigned long long)map_total_size, perms_str);
 
-
             /* Create the mapping in Unicorn */
             err = uc_mem_map(uc, map_start_addr, map_total_size, uc_perms);
             if (err != UC_ERR_OK) {
@@ -163,6 +162,29 @@ int load_program(uc_engine *uc, struct program_info *pinfo)
                             (unsigned long long)seg_actual_vaddr, err, uc_strerror(err));
                     free(buffer);
                     return -1;
+                }
+            }
+
+            /* Zero out BSS portion (memsz > filesz) */
+            if (phdr->p_memsz > phdr->p_filesz) {
+                uint64_t bss_start_addr = seg_actual_vaddr + phdr->p_filesz;
+                size_t bss_size = phdr->p_memsz - phdr->p_filesz;
+
+                if (bss_size > 0) {
+                    unsigned char *zero_buffer = (unsigned char *)calloc(stack_size, 1);
+                    if (!zero_buffer) {
+                        fprintf(stderr, "Failed to allocate zero buffer for BSS segment\n");
+                        free(buffer);
+                        return -1;
+                    }
+
+                    err = uc_mem_write(uc, bss_start_addr, zero_buffer, bss_size);
+                    free(zero_buffer);
+                    if (err != UC_ERR_OK) {
+                        fprintf(stderr, "Error zeroing BSS section at 0x%lx: %u (%s)\n", bss_start_addr, err, uc_strerror(err));
+                        free(buffer);
+                        return -1;
+                    }
                 }
             }
 
