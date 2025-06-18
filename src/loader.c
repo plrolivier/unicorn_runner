@@ -184,6 +184,10 @@ int load_program(uc_engine *uc, struct program_info *pinfo)
     pinfo->base_address = actual_min_load_addr;
     pinfo->size = actual_max_load_addr_end - actual_min_load_addr;
     pinfo->entrypoint = load_offset + ehdr->e_entry;
+    pinfo->phdr_addr = load_offset + ehdr->e_phoff;
+    pinfo->phentsize = ehdr->e_phentsize;
+    pinfo->phnum = ehdr->e_phnum;
+
 
     printf("[!] Program '%s' loaded. Effective Base: 0x%lx, Effective Size: 0x%zx, Entry Point: 0x%lx\n",
            pinfo->path, pinfo->base_address, pinfo->size, pinfo->entrypoint);

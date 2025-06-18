@@ -140,7 +140,6 @@ void hook_code(uc_engine *uc, uint64_t address, uint32_t size, void *user_data)
     uint32_t r_eip;
     cs_insn *insn;
     size_t count;
-    uc_err err;
     unsigned char buffer[15];
 
     uc_reg_read(uc, UC_X86_REG_EIP, &r_eip);

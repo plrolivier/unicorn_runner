@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <elf.h>
 #include <unicorn/unicorn.h>
 
 #include "unicorn_runner.h"
@@ -8,6 +9,110 @@
 #define STACK_TOP_ADDRESS 0xc000000
 
 unsigned long stack_size;
+
+
+/* Helper functions to write to stack
+ */
+static uint32_t write_string_to_stack(uc_engine *uc, uint32_t current_esp, const char *str)
+{
+    size_t len = strlen(str) + 1;
+    current_esp -= len;
+
+    uc_err err = uc_mem_write(uc, current_esp, str, len);
+    if (err != UC_ERR_OK) {
+        fprintf(stderr, "Failed to write string '%s' to stack at 0x%x: %s\n", str, current_esp, uc_strerror(err));
+        return 0;
+    }
+    return current_esp;
+}
+
+static uint32_t write_dword_to_stack(uc_engine *uc, uint32_t current_esp, uint32_t value)
+{
+    current_esp -= sizeof(uint32_t);
+
+    uc_err err = uc_mem_write(uc, current_esp, &value, sizeof(uint32_t));
+    if (err != UC_ERR_OK) {
+        fprintf(stderr, "Failed to write dword 0x%x to stack at 0x%x: %s\n", value, current_esp, uc_strerror(err));
+        return 0;
+    }
+    return current_esp;
+}
+
+static int setup_stack(uc_engine *uc, struct program_info *pinfo, uint32_t *initial_esp)
+{
+    uint32_t esp = STACK_TOP_ADDRESS;
+    uint32_t execfn_addr, random_bytes_addr;
+    uint32_t argv_str_addr[pinfo->argc + 1];
+
+    /*
+     * 1. Write stings content to stack
+     */
+    esp = write_string_to_stack(uc, esp, pinfo->path);
+    if (esp == 0) return -1;
+    argv_str_addr[0] = esp;
+    execfn_addr = esp;
+
+    for (int i=0; i<pinfo->argc; i++) {
+        esp = write_string_to_stack(uc, esp, pinfo->argv[i]);
+        if (esp == 0) return -1;
+        argv_str_addr[i+1] = esp;
+    }
+
+    // Align stack point to 4-byte
+    esp &= ~0x3;
+    // Padding
+    esp -= 16;
+
+    /*
+     * 2. Write auxiliary vector (auxv)
+     */
+    random_bytes_addr = esp;
+    Elf32_auxv_t aux_val[] = {
+       {AT_RANDOM,  {.a_val = random_bytes_addr}},
+       {AT_PAGESZ,  {.a_val = PAGE_SIZE}},
+       {AT_PHDR,    {.a_val = pinfo->phdr_addr}},
+       {AT_PHENT,   {.a_val = pinfo->phentsize}},
+       {AT_PHNUM,   {.a_val = pinfo->phnum}},
+       {AT_ENTRY,   {.a_val = pinfo->entrypoint}},
+       {AT_EXECFN,  {.a_val = execfn_addr}},
+       {AT_NULL,    {.a_val = 0}},
+    };
+
+    for (int i=sizeof(aux_val)-1; i>=0; i--) {
+        esp = write_dword_to_stack(uc, esp, aux_val[i].a_un.a_val);
+        if (esp == 0) return -1;
+        esp = write_dword_to_stack(uc, esp, aux_val[i].a_type);
+        if (esp == 0) return -1;
+    }
+
+    /*
+     * 3. Write environment pointers (envp)
+     */
+    // For now, empty environment with NULL terminator
+    esp = write_dword_to_stack(uc, esp, 0);
+    if (esp == 0) return -1;
+
+    /*
+     * 4. Write argument pointers (argv)
+     */
+    esp = write_dword_to_stack(uc, esp, 0);
+    if (esp == 0) return -1;
+
+    for (int i=pinfo->argc; i>=0; i--) {
+        esp = write_dword_to_stack(uc, esp, argv_str_addr[i]);
+        if (esp == 0) return -1;
+    }
+
+    /*
+     * 5. Write argc
+     */
+    esp = write_dword_to_stack(uc, esp, pinfo->argc + 1);
+    if (esp == 0) return -1;
+
+    *initial_esp = esp;
+    return 0;
+}
+
 
 
 uc_engine *init_unicorn(struct program_info *pinfo)
@@ -68,7 +173,12 @@ uc_engine *init_unicorn(struct program_info *pinfo)
         uc_close(uc);
         return NULL;
     }
-    r_esp = STACK_TOP_ADDRESS - sizeof(uint32_t);
+
+    if (setup_stack(uc, pinfo, &r_esp) != 0) {
+        fprintf(stderr, "Failed to setup stack\n");
+        uc_close(uc);
+        return NULL;
+    }
     printf("[!] Stack mapped at 0x%lx - 0x%x (size 0x%lx bytes)\n", stack_bottom, STACK_TOP_ADDRESS - 1, stack_size);
 
     /* Initialize registers */

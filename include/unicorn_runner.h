@@ -19,6 +19,10 @@ struct program_info {
     size_t size;
     unsigned long base_address;
     unsigned long entrypoint;
+    // ELF header info for auxv
+    uint32_t phdr_addr; // Address of program header table in memory
+    uint16_t phentsize; // Size of one program header entry
+    uint16_t phnum;     // Number of program headers
 };
 
 
