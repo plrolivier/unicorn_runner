@@ -206,7 +206,7 @@ int load_program(uc_engine *uc, struct program_info *pinfo)
     pinfo->base_address = actual_min_load_addr;
     pinfo->size = actual_max_load_addr_end - actual_min_load_addr;
     pinfo->entrypoint = load_offset + ehdr->e_entry;
-    pinfo->phdr_addr = load_offset + ehdr->e_phoff;
+    pinfo->phdr_addr = pinfo->base_address + ehdr->e_phoff;
     pinfo->phentsize = ehdr->e_phentsize;
     pinfo->phnum = ehdr->e_phnum;
 
