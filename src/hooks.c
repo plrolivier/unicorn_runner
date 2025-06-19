@@ -1,15 +1,18 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <string.h>
+#include <errno.h>
 #include <capstone/capstone.h>
 
 #include "hooks.h"
+#include "syscall.h"
 
 
 #define MIN(a, b) (a < b ? a : b)
 
 bool capstone_init = 0;
 csh cs;
+
 
 void print_registers(uc_engine *uc) {
     uint32_t eax, ebx, ecx, edx, esi, edi, ebp, esp, eip, eflags;
@@ -134,6 +137,7 @@ void print_memory_mappings(uc_engine *uc) {
     uc_free(regions); // allocated by uc_mem_regions
 }
 
+
 void hook_code(uc_engine *uc, uint64_t address, uint32_t size, void *user_data)
 {
     uint32_t r_eip;
@@ -167,4 +171,48 @@ void hook_code(uc_engine *uc, uint64_t address, uint32_t size, void *user_data)
     print_disassembled_code(uc, address, 64, 5);
     print_memory_mappings(uc);
     */
+}
+
+
+void hook_syscall(uc_engine *uc, uint32_t intno, void *user_data)
+{
+    uint32_t r_eip;
+    struct syscall sc;
+
+    /* For now, only handle syscalls */
+    if (intno != 0x80) {
+        uc_reg_read(uc, UC_X86_REG_EIP, &r_eip);
+        fprintf(stderr, "[-] Unhandled interrupt %d @ 0x%x\n", intno, r_eip);
+        return;
+    }
+
+    /* Read syscall number and arguments */
+    uc_reg_read(uc, UC_X86_REG_EAX, &sc.no);
+    uc_reg_read(uc, UC_X86_REG_EBX, &sc.args[0]);
+    uc_reg_read(uc, UC_X86_REG_ECX, &sc.args[1]);
+    uc_reg_read(uc, UC_X86_REG_EDX, &sc.args[2]);
+    uc_reg_read(uc, UC_X86_REG_ESI, &sc.args[3]);
+    uc_reg_read(uc, UC_X86_REG_EDI, &sc.args[4]);
+    uc_reg_read(uc, UC_X86_REG_EBP, &sc.args[5]);
+    sc.retval = (uint32_t)-ENOSYS;
+
+    switch (sc.no) {
+        case SYS_EXIT:
+        case SYS_EXIT_GROUP:
+            handle_sys_exit(uc, &sc);
+            break;
+
+        case SYS_BRK:
+            handle_sys_brk(uc, &sc);
+            break;
+
+        default:
+            uc_reg_read(uc, UC_X86_REG_EIP, &r_eip);
+            fprintf(stderr, "[-] Unhandled syscall %u @ 0x%x. Args= 0x%x, 0x%x, 0x%x\n",
+                    sc.no, r_eip, sc.args[0], sc.args[1], sc.args[2]);
+            break;
+    }
+
+    /* Write return value */
+    uc_reg_write(uc, UC_X86_REG_EAX, &sc.retval);
 }
