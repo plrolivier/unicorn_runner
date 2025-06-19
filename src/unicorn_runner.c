@@ -5,7 +5,7 @@
 
 #include "unicorn_runner.h"
 #include "hooks.h"
-#include "syscall.h"
+#include "syscalls.h"
 
 #define STACK_TOP_ADDRESS 0xc000000
 
@@ -232,7 +232,7 @@ uc_engine *init_unicorn(struct program_info *pinfo)
     }
 
     /* Register hooks */
-    //uc_hook_add(uc, &hk_code, UC_HOOK_CODE, hook_code, NULL, 1, 0);
+    uc_hook_add(uc, &hk_code, UC_HOOK_CODE, hook_code, NULL, 1, 0);
     uc_hook_add(uc, &hk_syscall, UC_HOOK_INTR, hook_syscall, NULL, 1, 0);
 
     /* Some debugging info */

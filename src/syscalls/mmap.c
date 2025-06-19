@@ -1,10 +1,11 @@
 #include <stdio.h>
-#include <errno.h>
+#include <stddef.h>
 #include <unicorn/unicorn.h>
 
-#include "syscall.h"
+#include "syscalls.h"
 #include "unicorn_runner.h"
 #include "hooks.h"
+
 
 
 static uint64_t program_break = 0;
@@ -14,15 +15,6 @@ void init_brk(uint64_t initial_brk_val) {
     program_break = initial_brk_val;
 }
 
-
-
-void handle_sys_exit(uc_engine *uc, struct syscall *sc)
-{
-    printf("[!] SYSCALL: %s(%d)\n", (sc->no == SYS_EXIT) ? "exit" : "exit_group", sc->args[0]);
-    uc_emu_stop(uc);
-    sc->retval = 0; 
-}
-
 void handle_sys_brk(uc_engine *uc, struct syscall *sc)
 {
     uc_err err;
@@ -30,8 +22,8 @@ void handle_sys_brk(uc_engine *uc, struct syscall *sc)
     uint64_t aligned_new_brk, aligned_current_brk, map_start;
     size_t map_size;
     
-    printf("[!] brk(0x%x)\n", sc->args[0]);
     addr = sc->args[0];
+    printf("[!] brk(addr=0x%x)\n", addr);
 
     /* Calling with 0x0 is used to find the current location of program break,
      * otherwise allocate memory on the heap
@@ -71,3 +63,14 @@ void handle_sys_brk(uc_engine *uc, struct syscall *sc)
 }
 
 
+void handle_sys_mprotect(uc_engine *uc, struct syscall *sc)
+{
+    uint32_t addr = sc->args[0];
+    size_t len = (size_t)sc->args[1];
+    int prot = (int)sc->args[2];
+
+    printf("[!] mprotect(addr=0x%x, len=0x%zx, prot=0x%x)\n", addr, len, prot);
+
+    // not implemented
+    sc->retval = 0;
+}

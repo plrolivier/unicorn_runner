@@ -5,7 +5,7 @@
 #include <capstone/capstone.h>
 
 #include "hooks.h"
-#include "syscall.h"
+#include "syscalls.h"
 
 
 #define MIN(a, b) (a < b ? a : b)
@@ -204,6 +204,40 @@ void hook_syscall(uc_engine *uc, uint32_t intno, void *user_data)
 
         case SYS_BRK:
             handle_sys_brk(uc, &sc);
+            break;
+
+        case SYS_SET_THREAD_AREA:
+            handle_sys_set_thread_area(uc, &sc);
+            break;
+
+        case SYS_SET_TID_ADDRESS:
+            handle_sys_set_tid_address(uc, &sc);
+            break;
+
+        case SYS_SET_ROBUST_LIST:
+            handle_sys_set_robust_list(uc, &sc);
+            break;
+
+        case SYS_RSEQ:
+            handle_sys_rseq(uc, &sc);
+            break;
+
+        case SYS_UGETRLIMIT:
+            handle_sys_ugetrlimit(uc, &sc);
+            break;
+
+        /*
+        case SYS_READLINKAT:
+            handle_sys_readlinkat(uc, &sc);
+            break;
+
+        case SYS_GETRANDOM:
+            handle_sys_getrandom(uc, &sc);
+            break;
+        */
+
+        case SYS_MPROTECT:
+            handle_sys_mprotect(uc, &sc);
             break;
 
         default:
