@@ -165,8 +165,8 @@ void hook_code(uc_engine *uc, uint64_t address, uint32_t size, void *user_data)
         printf("    <Failed to disassemble code at 0x%"PRIx64">\n", address);
     }
 
-    /*
     print_registers(uc);
+    /*
     print_stack(uc, 8);
     print_disassembled_code(uc, address, 64, 5);
     print_memory_mappings(uc);
@@ -174,17 +174,9 @@ void hook_code(uc_engine *uc, uint64_t address, uint32_t size, void *user_data)
 }
 
 
-void hook_syscall(uc_engine *uc, uint32_t intno, void *user_data)
+static void dispatch_syscall(uc_engine *uc)
 {
-    uint32_t r_eip;
     struct syscall sc;
-
-    /* For now, only handle syscalls */
-    if (intno != 0x80) {
-        uc_reg_read(uc, UC_X86_REG_EIP, &r_eip);
-        fprintf(stderr, "[-] Unhandled interrupt %d @ 0x%x\n", intno, r_eip);
-        return;
-    }
 
     /* Read syscall number and arguments */
     uc_reg_read(uc, UC_X86_REG_EAX, &sc.no);
@@ -241,12 +233,29 @@ void hook_syscall(uc_engine *uc, uint32_t intno, void *user_data)
             break;
 
         default:
+            uint32_t r_eip;
             uc_reg_read(uc, UC_X86_REG_EIP, &r_eip);
-            fprintf(stderr, "[-] Unhandled syscall %u @ 0x%x. Args= 0x%x, 0x%x, 0x%x\n",
+            fprintf(stderr, "[-] Unhandled syscall 0x%x @ 0x%x. Args= 0x%x, 0x%x, 0x%x\n",
                     sc.no, r_eip, sc.args[0], sc.args[1], sc.args[2]);
             break;
     }
 
     /* Write return value */
     uc_reg_write(uc, UC_X86_REG_EAX, &sc.retval);
+}
+
+
+void hook_int(uc_engine *uc, uint32_t intno, void *user_data)
+{
+    switch (intno) {
+
+        case 0x80:
+            dispatch_syscall(uc);
+            break;
+
+        default:
+            uint32_t r_eip;
+            uc_reg_read(uc, UC_X86_REG_EIP, &r_eip);
+            fprintf(stderr, "[-] Unhandled interrupt 0x%x @ 0x%x\n", intno, r_eip);
+    }
 }

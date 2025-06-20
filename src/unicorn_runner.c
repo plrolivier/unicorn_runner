@@ -190,7 +190,7 @@ uc_engine *init_unicorn(struct program_info *pinfo)
 {
     uc_engine *uc;
     uc_err err;
-    uc_hook hk_code, hk_syscall;
+    uc_hook hk_code, hk_int;
     uint32_t r_esp;
 
     printf("[>] Initialize Unicorn\n");
@@ -233,7 +233,7 @@ uc_engine *init_unicorn(struct program_info *pinfo)
 
     /* Register hooks */
     uc_hook_add(uc, &hk_code, UC_HOOK_CODE, hook_code, NULL, 1, 0);
-    uc_hook_add(uc, &hk_syscall, UC_HOOK_INTR, hook_syscall, NULL, 1, 0);
+    uc_hook_add(uc, &hk_int, UC_HOOK_INTR, hook_int, NULL, 1, 0);
 
     /* Some debugging info */
     print_memory_mappings(uc);
