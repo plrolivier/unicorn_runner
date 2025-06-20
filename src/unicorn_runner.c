@@ -6,6 +6,7 @@
 #include "unicorn_runner.h"
 #include "hooks.h"
 #include "syscalls.h"
+#include "gdt.h"
 
 #define STACK_TOP_ADDRESS 0xc000000
 
@@ -220,6 +221,13 @@ uc_engine *init_unicorn(struct program_info *pinfo)
     /* Initialize heap */
     if (init_heap(uc, pinfo) != 0) {
         fprintf(stderr, "Failed to initialize heap memory\n");
+        uc_close(uc);
+        return NULL;
+    }
+
+    /* Initialize x86 GDT */
+    if (gdt_init(uc) !=0) {
+        fprintf(stderr, "Failed to initialize GDT\n");
         uc_close(uc);
         return NULL;
     }

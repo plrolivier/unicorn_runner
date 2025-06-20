@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stddef.h>
 #include <errno.h>
 #include <unicorn/unicorn.h>
 
@@ -25,18 +26,19 @@ void handle_sys_set_thread_area(uc_engine *uc, struct syscall *sc)
         return;
     }
 
-    /* Get an unused index */
-    idx = gdt_get_tls_index();
-    if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX) {
-        sc->retval = (uint32_t)-EFAULT;
-        return;
-    }
-
     /* Write the selected GDT entry into memory */
     if (u_info.entry_number == -1) {
+
+        /* Get an unused index */
+        idx = gdt_get_tls_index();
+        if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX) {
+            sc->retval = (uint32_t)-EFAULT;
+            return;
+        }
+
         u_info.entry_number = idx;
         err = uc_mem_write(uc,
-                           (uint64_t)&((struct user_desc *)u_info_addr)->entry_number,
+                           u_info_addr + offsetof(struct user_desc, entry_number),
                            &u_info.entry_number,
                            sizeof(u_info.entry_number));
         if (err != UC_ERR_OK) {
@@ -45,10 +47,21 @@ void handle_sys_set_thread_area(uc_engine *uc, struct syscall *sc)
             sc->retval = (uint32_t)-EFAULT;
             return;
         }
+
+    } else {
+        idx = u_info.entry_number;
+        if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX) {
+            fprintf(stderr, "Error: requested GDT entry_number %u is out of TLS range\n", idx);
+            sc->retval = (uint32_t)-EINVAL;
+            return;
+        }
     }
 
     /* Populate the GDT with the TLS entry */
-    gdt_allocate_tls_entry(&u_info, idx);
+    if (gdt_allocate_tls_entry(uc, &u_info, idx) != 0) {
+        sc->retval = (uint32_t)-EFAULT;
+        return;
+    }
 
     /* Return success */
     sc->retval = 0;
