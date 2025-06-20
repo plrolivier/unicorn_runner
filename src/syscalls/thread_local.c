@@ -43,7 +43,7 @@ void handle_sys_set_thread_area(uc_engine *uc, struct syscall *sc)
                            sizeof(u_info.entry_number));
         if (err != UC_ERR_OK) {
             fprintf(stderr, "Failed to write user_desc->entry_number @ 0x%x: %s\n",
-                &((struct user_desc *)u_info_addr)->entry_number, uc_strerror(err));
+                (uint32_t)&((struct user_desc *)u_info_addr)->entry_number, uc_strerror(err));
             sc->retval = (uint32_t)-EFAULT;
             return;
         }

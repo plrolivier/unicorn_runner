@@ -18,7 +18,7 @@ int gdt_init(uc_engine *uc)
     /* Map and zero GDT into unicorn memory */
     err = uc_mem_map(uc, GDT_BASE_ADDRESS, PAGE_SIZE, UC_PROT_READ | UC_PROT_WRITE);
     if (err != UC_ERR_OK) {
-        fprintf(stderr, "Failed to map GDT memory in Unicorn at 0x%llx: %s\n", GDT_BASE_ADDRESS, uc_strerror(err));
+        fprintf(stderr, "Failed to map GDT memory in Unicorn at 0x%x: %s\n", GDT_BASE_ADDRESS, uc_strerror(err));
         return -1;
     }
 
@@ -104,8 +104,10 @@ int gdt_allocate_tls_entry(uc_engine *uc, const struct user_desc *u_info, unsign
             break;
         case 1:     // stack
             type = u_info->read_exec_only ? 0b0100 : 0b0110;    // ED=1, W=0/1, A=0
+            break;
         case 2:     // code
             type = u_info->read_exec_only ? 0b1000 : 0b1010;    //  C=0, R=0/1, A=0
+            break;
     }
     access |= type;
     sd.access = access;
@@ -114,7 +116,7 @@ int gdt_allocate_tls_entry(uc_engine *uc, const struct user_desc *u_info, unsign
     gdt_entry_addr = GDT_BASE_ADDRESS + (index * sizeof(struct segment_descriptor));
     err = uc_mem_write(uc, gdt_entry_addr, &sd, sizeof(struct segment_descriptor));
     if (err != UC_ERR_OK) {
-        fprintf(stderr, "Failed to write GDT entry %u @ 0x%llx: %s\n", index, gdt_entry_addr, uc_strerror(err));
+        fprintf(stderr, "Failed to write GDT entry %u @ 0x%lx: %s\n", index, gdt_entry_addr, uc_strerror(err));
         return -1;
     }
 
